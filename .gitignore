@@ -1,0 +1,9 @@
+# Ignore reference documentation folder
+RoadDNA/
+
+# Node dependencies and build artifacts
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
