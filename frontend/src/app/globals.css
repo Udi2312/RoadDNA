@@ -1,26 +1,46 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --rd-bg: #f3f6f4;
+  --rd-panel: #ffffff;
+  --rd-fg: #14201a;
+  --rd-muted: #5b6b63;
+  --rd-border: #d7e0db;
+  --rd-hover: #e8efeb;
+  --rd-accent: #0f7a4e;
+  --rd-accent-soft: #0f7a4e18;
+  --background: var(--rd-bg);
+  --foreground: var(--rd-fg);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --rd-bg: #0c1210;
+    --rd-panel: #141c18;
+    --rd-fg: #e8f0eb;
+    --rd-muted: #9aaba2;
+    --rd-border: #24302a;
+    --rd-hover: #1c2621;
+    --rd-accent: #3ecf8e;
+    --rd-accent-soft: #3ecf8e22;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--rd-bg);
+  color: var(--rd-fg);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.leaflet-container {
+  font: inherit;
+  background: var(--rd-bg);
 }
