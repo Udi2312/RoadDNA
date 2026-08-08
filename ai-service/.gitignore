@@ -1,0 +1,24 @@
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Model artifacts & large datasets
+models/*.joblib
+models/*.pkl
+models/*.onnx
+*.csv
