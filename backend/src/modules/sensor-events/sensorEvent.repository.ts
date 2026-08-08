@@ -1,15 +1,9 @@
 // ─── Raw SQL queries for sensor_events + devices tables ───
-// This is the ONLY file that touches the database directly.
-// Services call these functions — never write SQL in controllers.
 
-import { pool } from "../../config/database";
+import { queryWithRetry } from "../../config/database";
 import { SensorEventInput, SensorEventRow } from "./sensorEvent.types";
 import { PaginationParams } from "../../shared/utils/pagination";
 
-/**
- * Insert a single sensor event into the database.
- * Combines lat/lng into a PostGIS GEOGRAPHY point on insert.
- */
 export async function insertSensorEvent(
   event: SensorEventInput
 ): Promise<string> {
@@ -26,7 +20,7 @@ export async function insertSensorEvent(
   const values = [
     event.device_id,
     event.timestamp,
-    event.longitude, // ST_MakePoint takes (lng, lat) — NOT (lat, lng)!
+    event.longitude,
     event.latitude,
     event.speed_kmh ?? null,
     event.accel_x,
@@ -38,16 +32,12 @@ export async function insertSensorEvent(
     event.gyro_z,
   ];
 
-  const result = await pool.query(query, values);
+  const result = await queryWithRetry<{ event_id: string }>(query, values);
   return result.rows[0].event_id;
 }
 
-/**
- * Upsert a device — insert if new, update last_seen_at if existing.
- * Called automatically on every ingestion batch.
- */
 export async function ensureDevice(deviceId: string): Promise<void> {
-  await pool.query(
+  await queryWithRetry(
     `INSERT INTO devices (device_id)
      VALUES ($1)
      ON CONFLICT (device_id) DO UPDATE
@@ -56,10 +46,6 @@ export async function ensureDevice(deviceId: string): Promise<void> {
   );
 }
 
-/**
- * Query sensor events with optional filters + pagination.
- * Extracts lat/lng back from the PostGIS geography column.
- */
 export async function findSensorEvents(
   filters: { device_id?: string; from?: string; to?: string },
   pagination: PaginationParams
@@ -84,14 +70,12 @@ export async function findSensorEvents(
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  // Count total matching rows
-  const countResult = await pool.query(
+  const countResult = await queryWithRetry<{ total: number }>(
     `SELECT COUNT(*)::int AS total FROM sensor_events ${where}`,
     values
   );
-  const total: number = countResult.rows[0].total;
+  const total: number = countResult.rows[0]?.total || 0;
 
-  // Fetch paginated data
   const dataQuery = `
     SELECT event_id, device_id, recorded_at,
            ST_Y(location::geometry) AS latitude,
@@ -103,9 +87,9 @@ export async function findSensorEvents(
     ORDER BY recorded_at DESC
     LIMIT $${idx++} OFFSET $${idx++}
   `;
-  values.push(pagination.limit, pagination.offset);
+  const dataValues = [...values, pagination.limit, pagination.offset];
 
-  const dataResult = await pool.query(dataQuery, values);
+  const dataResult = await queryWithRetry<SensorEventRow>(dataQuery, dataValues);
 
   return { rows: dataResult.rows, total };
 }

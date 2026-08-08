@@ -7,7 +7,12 @@ import cors from "cors";
 import helmet from "helmet";
 import { requestLogger } from "./middleware/requestLogger.middleware";
 import { errorHandler } from "./middleware/errorHandler.middleware";
+
+import authRoutes from "./modules/auth/auth.routes";
 import sensorEventRoutes from "./modules/sensor-events/sensorEvent.routes";
+import clusterRoutes from "./modules/clusters/cluster.routes";
+import workOrderRoutes from "./modules/work-orders/workOrder.routes";
+import citizenReportRoutes from "./modules/citizen-reports/citizenReport.routes";
 
 export function createApp() {
   const app = express();
@@ -24,7 +29,11 @@ export function createApp() {
   });
 
   // ─── API v1 routes ───
+  app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1/sensor-events", sensorEventRoutes);
+  app.use("/api/v1/clusters", clusterRoutes);
+  app.use("/api/v1/work-orders", workOrderRoutes);
+  app.use("/api/v1/citizen-reports", citizenReportRoutes);
 
   // ─── 404 fallback ───
   app.use((_req: Request, res: Response) => {
