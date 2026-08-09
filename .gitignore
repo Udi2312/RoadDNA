@@ -1,3 +1,26 @@
+# Root
+.DS_Store
+*.log
+.env
+.env.local
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Mobile
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Backend (Shanky)
+backend/node_modules/
+backend/.env
+**/__pycache__/
+**/.venv/
 # Ignore reference documentation folder
 RoadDNA/
 
