@@ -1,220 +1,146 @@
-# RoadDNA API Contract
+# RoadDNA API Contract — Phase 1 & 2 (aligned with Shankar backend)
 
-Source of truth for frontend (`frontend/`), mobile (`mobile/`), and backend (`backend/`).  
-Update this file together whenever an endpoint shape changes.
+Source of truth for frontend (`frontend/`) and mobile (`mobile/`).
 
-Base URL (local): `http://localhost:3001`  
-Frontend env: `NEXT_PUBLIC_API_BASE_URL`  
-Mobile env: `API_BASE_URL`
+**Base URL:** `http://localhost:5000/api/v1`  
+**Frontend env:** `NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1`  
+**Auth header:** `Authorization: Bearer <token>`
 
-When `NEXT_PUBLIC_USE_MOCKS=true` (default), the dashboard serves fixtures that match these shapes exactly.
+All success responses use:
+
+```json
+{ "success": true, "data": ... , "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 } }
+```
+
+(`pagination` only on list endpoints.)
+
+When `NEXT_PUBLIC_USE_MOCKS=true`, the dashboard uses fixtures matching these shapes.
 
 ---
 
 ## Endpoints
 
-| Endpoint | Method | Purpose | Owner |
-|----------|--------|---------|-------|
-| `/api/v1/auth/login` | POST | Admin/engineer login | Shanky |
-| `/api/v1/clusters?bounds=` | GET | Clusters within map viewport | Shanky |
-| `/api/v1/clusters/:id` | GET | Single cluster detail | Shanky |
-| `/api/v1/work-orders?status=` | GET | Repair priority queue | Shanky |
-| `/api/v1/work-orders/:id` | PATCH | Update repair status | Shanky |
-| `/api/v1/analytics/summary` | GET | Trends for charts | Shanky |
-| `/api/v1/sensor-events` | POST | Mobile detected event | Shanky |
-| `/api/v1/citizen-reports` | POST | Manual report with photo | Shanky |
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/auth/login` | POST | Public | Admin login → JWT + refresh |
+| `/auth/me` | GET | Bearer | Current admin profile |
+| `/clusters` | GET | Public | List clusters (`status`, `severity_min`, `bbox`, `page`, `limit`) |
+| `/clusters/:id` | GET | Public | Cluster + linked events |
+| `/work-orders` | GET | Bearer | List work orders |
+| `/work-orders` | POST | Bearer (admin/engineer) | Create work order |
+| `/work-orders/:id` | PATCH | Bearer (admin/engineer) | Update status |
+| `/citizen-reports` | POST | Public | Manual citizen report |
+| `/citizen-reports` | GET | Bearer* | List reports (dashboard; mock + expected) |
+| `/sensor-events` | POST | Public | Mobile telemetry batch |
+
+\* GET citizen-reports may be provided later by backend; frontend mocks it for the Phase 2 reports UI.
 
 ---
 
-## POST `/api/v1/auth/login`
-
-**Request**
+## POST `/auth/login`
 
 ```json
-{
-  "email": "admin@roaddna.local",
-  "password": "password"
-}
+{ "email": "admin@roaddna.gov", "password": "AdminPassword123!" }
 ```
 
-**Response**
-
 ```json
 {
-  "token": "jwt-token-here",
-  "user": {
-    "id": "usr_001",
-    "email": "admin@roaddna.local",
-    "name": "Campus Admin",
-    "role": "admin"
+  "success": true,
+  "data": {
+    "token": "eyJ...",
+    "refreshToken": "eyJ...",
+    "user": {
+      "admin_id": "2f74d8db-868c-4ac5-8432-ed906fd78adb",
+      "email": "admin@roaddna.gov",
+      "full_name": "Lead City Engineer",
+      "role": "admin"
+    }
   }
 }
 ```
 
 ---
 
-## POST `/api/v1/sensor-events`
+## GET `/clusters?bbox=&status=&severity_min=&page=1&limit=20`
+
+`bbox` = `min_lng,min_lat,max_lng,max_lat`
+
+Severity is **0–100**. UI bands: &lt;40 low, 40–70 moderate, ≥70 severe.
 
 ```json
 {
-  "device_id": "dev_0033",
-  "timestamp": "2026-08-06T09:15:40Z",
+  "success": true,
+  "data": [
+    {
+      "cluster_id": "63a64ab2-5a25-49d4-87d6-7820bfb256c2",
+      "latitude": 28.6139,
+      "longitude": 77.2090,
+      "report_count": 5,
+      "distinct_devices": 3,
+      "severity_score": 85.5,
+      "status": "unconfirmed",
+      "last_reported_at": "2026-08-07T20:20:00Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+---
+
+## GET `/clusters/:id`
+
+```json
+{
+  "success": true,
+  "data": {
+    "cluster": { "cluster_id": "...", "severity_score": 85.5, "status": "queued" },
+    "events": [
+      {
+        "event_id": "...",
+        "device_id": "dev_001",
+        "accel_magnitude": 18.2,
+        "predicted_label": "pothole",
+        "confidence": 0.95
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Work orders
+
+Lifecycle: `open` → `assigned` → `in_progress` → `completed`  
+Completing sets cluster status to `fixed`. Creating sets cluster to `queued`.
+
+**POST `/work-orders`**
+
+```json
+{
+  "cluster_id": "63a64ab2-5a25-49d4-87d6-7820bfb256c2",
+  "assigned_to": "2f74d8db-868c-4ac5-8432-ed906fd78adb",
+  "priority_rank": 1
+}
+```
+
+**PATCH `/work-orders/:id`**
+
+```json
+{ "status": "completed" }
+```
+
+---
+
+## POST `/citizen-reports`
+
+```json
+{
+  "device_id": "dev_0001",
   "latitude": 28.6139,
   "longitude": 77.2090,
-  "speed_kmh": 34.5,
-  "accel_x": -0.42,
-  "accel_y": 0.18,
-  "accel_z": -21.3,
-  "gyro_x": 0.06,
-  "gyro_y": -0.12,
-  "gyro_z": 0.02
+  "description": "Large pothole observed near market intersection",
+  "photo_url": "https://example.com/photo.jpg"
 }
 ```
-
-**Response:** `{ "ok": true, "event_id": "evt_uuid" }`
-
----
-
-## GET `/api/v1/clusters?bounds=`
-
-`bounds` = `south,west,north,east` (optional).
-
-```json
-{
-  "clusters": [
-    {
-      "cluster_id": "uuid",
-      "latitude": 28.6142,
-      "longitude": 77.2095,
-      "severity_score": 8.4,
-      "report_count": 12,
-      "status": "confirmed",
-      "last_reported_at": "2026-08-05T18:30:00Z"
-    }
-  ]
-}
-```
-
-Severity guide for UI coloring:
-
-- `severity_score < 4` → good / low (green)
-- `4 <= severity_score < 7` → moderate (yellow)
-- `severity_score >= 7` → severe (red)
-
----
-
-## GET `/api/v1/clusters/:id`
-
-```json
-{
-  "cluster_id": "uuid",
-  "latitude": 28.6142,
-  "longitude": 77.2095,
-  "severity_score": 8.4,
-  "report_count": 12,
-  "status": "confirmed",
-  "last_reported_at": "2026-08-05T18:30:00Z",
-  "first_reported_at": "2026-07-20T10:00:00Z",
-  "device_count": 5,
-  "avg_impact": 18.2,
-  "history": [
-    {
-      "timestamp": "2026-08-05T18:30:00Z",
-      "device_id": "dev_0033",
-      "label": "pothole",
-      "confidence": 0.91
-    }
-  ]
-}
-```
-
----
-
-## GET `/api/v1/work-orders?status=`
-
-`status` optional: `open` | `assigned` | `in_progress` | `fixed` | `rejected`
-
-```json
-{
-  "work_orders": [
-    {
-      "id": "wo_001",
-      "cluster_id": "uuid",
-      "road_name": "North Gate Road",
-      "severity_score": 8.4,
-      "report_count": 12,
-      "priority": 1,
-      "status": "open",
-      "assigned_to": null,
-      "latitude": 28.6142,
-      "longitude": 77.2095,
-      "created_at": "2026-08-01T09:00:00Z",
-      "updated_at": "2026-08-01T09:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-## PATCH `/api/v1/work-orders/:id`
-
-```json
-{
-  "status": "assigned",
-  "assigned_to": "eng_raya"
-}
-```
-
-Allowed `status`: `open` | `assigned` | `in_progress` | `fixed` | `rejected`
-
-**Response:** updated work-order object.
-
----
-
-## GET `/api/v1/analytics/summary`
-
-```json
-{
-  "totals": {
-    "total_reports": 148,
-    "confirmed_potholes": 32,
-    "critical_roads": 7,
-    "active_devices": 18,
-    "reports_today": 9
-  },
-  "reports_per_day": [
-    { "date": "2026-08-01", "count": 12 }
-  ],
-  "severity_breakdown": [
-    { "label": "low", "count": 40 },
-    { "label": "moderate", "count": 55 },
-    { "label": "severe", "count": 32 }
-  ],
-  "area_comparisons": [
-    { "area": "North Campus", "health_pct": 72, "reports": 28 }
-  ],
-  "road_health_trend": [
-    { "date": "2026-08-01", "health_pct": 68 }
-  ],
-  "avg_repair_hours": 36.5
-}
-```
-
----
-
-## POST `/api/v1/citizen-reports`
-
-Multipart preferred; JSON mock accepted:
-
-```json
-{
-  "device_id": "dev_0033",
-  "latitude": 28.6139,
-  "longitude": 77.2090,
-  "description": "Large pothole near hostel gate",
-  "photo_base64": null
-}
-```
-
-**Response:** `{ "ok": true, "report_id": "cr_uuid" }`

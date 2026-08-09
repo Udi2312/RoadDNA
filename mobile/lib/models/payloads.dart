@@ -62,20 +62,20 @@ class CitizenReportPayload {
     required this.latitude,
     required this.longitude,
     required this.description,
-    this.photoBase64,
+    this.photoUrl,
   });
 
   final String deviceId;
   final double latitude;
   final double longitude;
   final String description;
-  final String? photoBase64;
+  final String? photoUrl;
 
   Map<String, dynamic> toJson() => {
         'device_id': deviceId,
         'latitude': latitude,
         'longitude': longitude,
         'description': description,
-        'photo_base64': photoBase64,
+        'photo_url': photoUrl,
       };
 }

@@ -15,7 +15,7 @@ class ApiClient {
   Future<Map<String, dynamic>> postSensorEvent(SensorEventPayload payload) async {
     final res = await http
         .post(
-          _uri('/api/v1/sensor-events'),
+          _uri('/sensor-events'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(payload.toJson()),
         )
@@ -34,7 +34,7 @@ class ApiClient {
   ) async {
     final res = await http
         .post(
-          _uri('/api/v1/citizen-reports'),
+          _uri('/citizen-reports'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(payload.toJson()),
         )

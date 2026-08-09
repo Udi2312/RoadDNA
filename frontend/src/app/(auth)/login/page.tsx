@@ -3,22 +3,20 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity } from "lucide-react";
-import { login } from "@/lib/api";
-import { useAuthStore } from "@/lib/store";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
-  const setSession = useAuthStore((s) => s.setSession);
-  const [email, setEmail] = useState("admin@roaddna.local");
-  const [password, setPassword] = useState("password");
+  const { token, login } = useAuth();
+  const [email, setEmail] = useState("admin@roaddna.gov");
+  const [password, setPassword] = useState("AdminPassword123!");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (token) router.replace("/dashboard");
+    if (token) router.replace("/map");
   }, [token, router]);
 
   async function onSubmit(e: FormEvent) {
@@ -26,9 +24,8 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await login(email, password);
-      setSession(res.token, res.user, remember);
-      router.replace("/dashboard");
+      await login(email, password, remember);
+      router.replace("/map");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -42,18 +39,9 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 20% 20%, #0f7a4e33, transparent), radial-gradient(ellipse 70% 50% at 80% 80%, #1d4ed833, transparent), linear-gradient(160deg, #0c1210, #14241c 45%, #0c1210)",
+            "radial-gradient(ellipse 80% 60% at 20% 20%, #0f7a4e33, transparent), radial-gradient(ellipse 70% 50% at 80% 14%, #1d4ed833, transparent), linear-gradient(160deg, #0c1210, #14241c 45%, #0c1210)",
         }}
       />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.12]"
-        style={{
-          backgroundImage:
-            "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-
       <form
         onSubmit={onSubmit}
         className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#141c18]/90 p-8 text-[#e8f0eb] shadow-2xl backdrop-blur"
@@ -117,7 +105,7 @@ export default function LoginPage() {
         </Button>
 
         <p className="mt-5 text-center text-xs text-[#9aaba2]">
-          Demo: admin@roaddna.local / password
+          Demo: admin@roaddna.gov / AdminPassword123!
         </p>
       </form>
     </div>

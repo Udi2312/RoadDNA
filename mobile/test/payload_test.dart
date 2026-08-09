@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roaddna_mobile/models/payloads.dart';
+// CitizenReportPayload is in the same library as SensorEventPayload.
 
 void main() {
   test('SensorEventPayload matches API contract keys', () {
@@ -31,5 +32,17 @@ void main() {
       'gyro_y',
       'gyro_z',
     ]));
+  });
+
+  test('CitizenReportPayload uses photo_url', () {
+    final json = CitizenReportPayload(
+      deviceId: 'dev_0001',
+      latitude: 28.6139,
+      longitude: 77.2090,
+      description: 'Large pothole',
+      photoUrl: 'https://example.com/photo.jpg',
+    ).toJson();
+    expect(json.containsKey('photo_url'), isTrue);
+    expect(json.containsKey('photo_base64'), isFalse);
   });
 }

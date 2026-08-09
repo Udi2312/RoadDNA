@@ -4,35 +4,35 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
-  BarChart3,
-  LayoutDashboard,
+  ClipboardList,
+  FileWarning,
   LogOut,
   Map,
   Menu,
   Wrench,
   X,
 } from "lucide-react";
-import { useAuthStore, useUiStore } from "@/lib/store";
+import { useAuth } from "@/context/AuthContext";
+import { useUiStore } from "@/lib/store";
 import { isMockMode } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/map", label: "Live Map", icon: Map },
-  { href: "/dashboard/queue", label: "Repair Queue", icon: Wrench },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/map", label: "Heatmap", icon: Map },
+  { href: "/clusters", label: "Clusters", icon: ClipboardList },
+  { href: "/work-orders", label: "Work Orders", icon: Wrench },
+  { href: "/reports", label: "Citizen Reports", icon: FileWarning },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const clearSession = useAuthStore((s) => s.clearSession);
+  const { user, logout } = useAuth();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
 
-  function logout() {
-    clearSession();
+  function onLogout() {
+    logout();
     router.replace("/login");
   }
 
@@ -67,8 +67,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <nav className="flex flex-1 flex-col gap-1 p-3">
           {nav.map((item) => {
             const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
             return (
               <Link
@@ -92,16 +91,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-[var(--rd-border)] p-4">
           {isMockMode() && (
             <p className="mb-3 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-              Mock API mode — swap via NEXT_PUBLIC_USE_MOCKS=false
+              Mock mode — set NEXT_PUBLIC_USE_MOCKS=false for live API
             </p>
           )}
           <div className="mb-3">
-            <p className="text-sm font-medium">{user?.name ?? "Operator"}</p>
-            <p className="text-xs text-[var(--rd-muted)]">{user?.email}</p>
+            <p className="text-sm font-medium">
+              {user?.full_name ?? "Operator"}
+            </p>
+            <p className="text-xs text-[var(--rd-muted)]">
+              {user?.email} · {user?.role}
+            </p>
           </div>
           <button
             type="button"
-            onClick={logout}
+            onClick={onLogout}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--rd-muted)] transition hover:bg-[var(--rd-hover)] hover:text-[var(--rd-fg)]"
           >
             <LogOut className="h-4 w-4" />
@@ -130,12 +133,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex-1">
-            <p className="text-sm text-[var(--rd-muted)]">Campus demo scope</p>
+            <p className="text-sm text-[var(--rd-muted)]">Phase 1 & 2 dashboard</p>
             <p className="font-medium">Road health operations</p>
           </div>
           <div className="hidden items-center gap-3 text-xs sm:flex">
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Good
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Low
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Moderate

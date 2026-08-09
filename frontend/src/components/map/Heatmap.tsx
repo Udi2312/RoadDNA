@@ -14,28 +14,29 @@ import "leaflet/dist/leaflet.css";
 import { useQuery } from "@tanstack/react-query";
 import { fetchClusters } from "@/lib/api";
 import { CAMPUS_CENTER } from "@/mocks/data";
-import { severityColor, severityLevel } from "@/lib/types";
+import { severityColor, severityLevel, severityTone } from "@/types/cluster";
 import { useUiStore } from "@/lib/store";
 import { Badge, Button, Card, Skeleton } from "@/components/ui";
 
 function BoundsReporter({
-  onBounds,
+  onBbox,
 }: {
-  onBounds: (bounds: string) => void;
+  onBbox: (bbox: string) => void;
 }) {
   const map = useMapEvents({
     moveend: () => {
       const b = map.getBounds();
-      onBounds(
-        `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`,
+      // Spec: bbox=min_lng,min_lat,max_lng,max_lat
+      onBbox(
+        `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
       );
     },
   });
 
   useEffect(() => {
     const b = map.getBounds();
-    onBounds(`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`);
-  }, [map, onBounds]);
+    onBbox(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+  }, [map, onBbox]);
 
   return null;
 }
@@ -50,32 +51,42 @@ function FlyToSelected({
   const map = useMap();
   useEffect(() => {
     if (lat != null && lng != null) {
-      map.flyTo([lat, lng], 17, { duration: 0.6 });
+      map.flyTo([lat, lng], 16, { duration: 0.6 });
     }
   }, [lat, lng, map]);
   return null;
 }
 
-export function ClusterMap({
+export function Heatmap({
   heightClass = "h-[560px]",
-  filterSeverity,
+  filterSeverity = "all",
+  status,
+  severityMin,
 }: {
   heightClass?: string;
   filterSeverity?: "all" | "low" | "moderate" | "severe";
+  status?: string;
+  severityMin?: number;
 }) {
-  const [bounds, setBounds] = useState<string | undefined>();
+  const [bbox, setBbox] = useState<string | undefined>();
   const [search, setSearch] = useState("");
   const selectedClusterId = useUiStore((s) => s.selectedClusterId);
   const setSelectedClusterId = useUiStore((s) => s.setSelectedClusterId);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["clusters", bounds],
-    queryFn: () => fetchClusters(bounds),
+    queryKey: ["clusters", bbox, status, severityMin],
+    queryFn: () =>
+      fetchClusters({
+        bbox,
+        status,
+        severity_min: severityMin,
+        limit: 100,
+      }),
   });
 
   const clusters = useMemo(() => {
-    let list = data?.clusters ?? [];
-    if (filterSeverity && filterSeverity !== "all") {
+    let list = data?.data ?? [];
+    if (filterSeverity !== "all") {
       list = list.filter((c) => severityLevel(c.severity_score) === filterSeverity);
     }
     if (search.trim()) {
@@ -104,7 +115,7 @@ export function ClusterMap({
           {isFetching ? "Refreshing…" : "Refresh"}
         </Button>
         <p className="text-xs text-[var(--rd-muted)]">
-          {clusters.length} cluster{clusters.length === 1 ? "" : "s"} in view
+          {clusters.length} cluster{clusters.length === 1 ? "" : "s"} in viewport
         </p>
       </div>
 
@@ -118,7 +129,7 @@ export function ClusterMap({
         ) : (
           <MapContainer
             center={[CAMPUS_CENTER.lat, CAMPUS_CENTER.lng]}
-            zoom={15}
+            zoom={13}
             className="h-full w-full"
             scrollWheelZoom
           >
@@ -126,54 +137,52 @@ export function ClusterMap({
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <BoundsReporter onBounds={setBounds} />
+            <BoundsReporter onBbox={setBbox} />
             <FlyToSelected
               lat={selected?.latitude ?? null}
               lng={selected?.longitude ?? null}
             />
-            {clusters.map((c) => (
-              <CircleMarker
-                key={c.cluster_id}
-                center={[c.latitude, c.longitude]}
-                radius={10 + Math.min(c.report_count, 8)}
-                pathOptions={{
-                  color: severityColor(c.severity_score),
-                  fillColor: severityColor(c.severity_score),
-                  fillOpacity: 0.75,
-                  weight: selectedClusterId === c.cluster_id ? 3 : 1,
-                }}
-                eventHandlers={{
-                  click: () => setSelectedClusterId(c.cluster_id),
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[180px] space-y-1 text-sm">
-                    <p className="font-semibold">{c.cluster_id}</p>
-                    <p>Severity: {c.severity_score.toFixed(1)}</p>
-                    <p>Reports: {c.report_count}</p>
-                    <Badge
-                      tone={
-                        severityLevel(c.severity_score) === "severe"
-                          ? "red"
-                          : severityLevel(c.severity_score) === "moderate"
-                            ? "yellow"
-                            : "green"
-                      }
-                    >
-                      {severityLevel(c.severity_score)}
-                    </Badge>
-                    <div className="pt-2">
-                      <Link
-                        href={`/dashboard/clusters/${c.cluster_id}`}
-                        className="text-[var(--rd-accent)] underline"
-                      >
-                        Open detail
-                      </Link>
+            {clusters.map((c) => {
+              const intensity = Math.min(1, c.severity_score / 100);
+              return (
+                <CircleMarker
+                  key={c.cluster_id}
+                  center={[c.latitude, c.longitude]}
+                  radius={8 + intensity * 14}
+                  pathOptions={{
+                    color: severityColor(c.severity_score),
+                    fillColor: severityColor(c.severity_score),
+                    fillOpacity: 0.35 + intensity * 0.45,
+                    weight: selectedClusterId === c.cluster_id ? 3 : 1,
+                  }}
+                  eventHandlers={{
+                    click: () => setSelectedClusterId(c.cluster_id),
+                  }}
+                >
+                  <Popup>
+                    <div className="min-w-[180px] space-y-1 text-sm">
+                      <p className="font-semibold">{c.cluster_id.slice(0, 8)}…</p>
+                      <p>Severity: {c.severity_score.toFixed(1)}</p>
+                      <p>
+                        Reports: {c.report_count} · Devices:{" "}
+                        {c.distinct_devices}
+                      </p>
+                      <Badge tone={severityTone(c.severity_score)}>
+                        {severityLevel(c.severity_score)}
+                      </Badge>
+                      <div className="pt-2">
+                        <Link
+                          href={`/clusters/${c.cluster_id}`}
+                          className="text-[var(--rd-accent)] underline"
+                        >
+                          Open detail
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            ))}
+                  </Popup>
+                </CircleMarker>
+              );
+            })}
           </MapContainer>
         )}
       </div>

@@ -7,7 +7,7 @@ class AppSettings {
 
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3001',
+    defaultValue: 'http://10.0.2.2:5000/api/v1',
   );
 
   late SharedPreferences _prefs;

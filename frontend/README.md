@@ -1,6 +1,6 @@
 # RoadDNA Frontend
 
-Municipality dashboard (Next.js + Tailwind + Leaflet + React Query).
+Municipality dashboard (Next.js 16 + Tailwind + Leaflet + React Query).
 
 ## Run
 
@@ -11,17 +11,18 @@ npm run dev
 
 ## Env
 
-See `.env.example`:
-
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:3001` | Shanky API origin |
-| `NEXT_PUBLIC_USE_MOCKS` | `true` | Use fixtures matching the API contract |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:5000/api/v1` | Shankar Phase 1/2 API |
+| `NEXT_PUBLIC_USE_MOCKS` | `true` | In-browser fixtures |
 
-Set `NEXT_PUBLIC_USE_MOCKS=false` to hit real endpoints (or run `npm run mock-api` from the repo root first).
+Demo login: `admin@roaddna.gov` / `AdminPassword123!`
 
-Copy `.env.integration.example` → `.env.local` for the HTTP integration profile.
+## Spec-aligned structure
 
-## Demo login
-
-`admin@roaddna.local` / `password`
+- `src/types/` — auth, cluster, workOrder
+- `src/lib/api.ts` — Axios + Bearer interceptor
+- `src/context/AuthContext.tsx`
+- `src/app/(auth)/login`
+- `src/app/(dashboard)/map|clusters|work-orders|reports`
+- `src/components/map/Heatmap.tsx`

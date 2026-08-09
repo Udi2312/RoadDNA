@@ -140,9 +140,9 @@ class _HomeScreenState extends State<HomeScreen> {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: 'http://10.0.2.2:3001',
+            hintText: 'http://10.0.2.2:5000/api/v1',
             helperText:
-                'Android emulator → 10.0.2.2:3001\nPhysical device → your LAN IP',
+                'Android emulator → 10.0.2.2:5000/api/v1\nPhysical device → http://<LAN-IP>:5000/api/v1',
           ),
         ),
         actions: [

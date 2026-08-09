@@ -81,8 +81,10 @@ class _ReportScreenState extends State<ReportScreen> {
         latitude: _lat!,
         longitude: _lng!,
         description: _desc.text.trim(),
-        photoBase64:
-            _photoBytes == null ? null : base64Encode(_photoBytes!),
+        // Phase 1/2 contract expects photo_url; data URI used until upload service exists.
+        photoUrl: _photoBytes == null
+            ? null
+            : 'data:image/jpeg;base64,${base64Encode(_photoBytes!)}',
       );
       final res = await ApiClient.instance.postCitizenReport(payload);
       if (!mounted) return;

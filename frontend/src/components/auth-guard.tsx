@@ -2,25 +2,20 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/store";
+import { useAuth } from "@/context/AuthContext";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
-  const hydrateFromStorage = useAuthStore((s) => s.hydrateFromStorage);
+  const { token, loading } = useAuth();
 
   useEffect(() => {
-    hydrateFromStorage();
-  }, [hydrateFromStorage]);
-
-  useEffect(() => {
-    if (!token) {
+    if (!loading && !token) {
       router.replace("/login");
     }
-  }, [token, router]);
+  }, [token, loading, router]);
 
-  if (!token) {
+  if (loading || !token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--rd-bg)] text-[var(--rd-muted)]">
         Checking session…
