@@ -13,7 +13,8 @@ const sensorEventSchema = z.object({
   accel_x: z.number(),
   accel_y: z.number(),
   accel_z: z.number(),
-  accel_magnitude: z.number().min(0),
+  // Optional — computed server-side if omitted
+  accel_magnitude: z.number().min(0).optional(),
   gyro_x: z.number(),
   gyro_y: z.number(),
   gyro_z: z.number(),

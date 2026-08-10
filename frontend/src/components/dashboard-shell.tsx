@@ -89,9 +89,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="border-t border-[var(--rd-border)] p-4">
-          {isMockMode() && (
+          {isMockMode() ? (
             <p className="mb-3 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
               Mock mode — set NEXT_PUBLIC_USE_MOCKS=false for live API
+            </p>
+          ) : (
+            <p className="mb-3 rounded-md bg-emerald-500/15 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+              Live API · localhost:5000
             </p>
           )}
           <div className="mb-3">

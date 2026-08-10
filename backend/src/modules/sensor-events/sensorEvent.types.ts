@@ -9,7 +9,7 @@ export interface SensorEventInput {
   accel_x: number;
   accel_y: number;
   accel_z: number;
-  accel_magnitude: number;
+  accel_magnitude?: number;
   gyro_x: number;
   gyro_y: number;
   gyro_z: number;

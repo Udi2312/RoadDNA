@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import {
   createMockCitizenReport,
   createMockWorkOrder,
@@ -45,6 +45,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+function apiErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as
+      | { message?: string; error?: string }
+      | undefined;
+    return data?.message || data?.error || err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 function delay(ms = 280) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -82,11 +93,15 @@ export async function login(email: string, password: string) {
     await delay();
     return mockLogin(email, password);
   }
-  const { data } = await api.post<ApiSuccess<ReturnType<typeof mockLogin>>>(
-    "/auth/login",
-    { email, password },
-  );
-  return unwrap(data);
+  try {
+    const { data } = await api.post<ApiSuccess<ReturnType<typeof mockLogin>>>(
+      "/auth/login",
+      { email, password },
+    );
+    return unwrap(data);
+  } catch (err) {
+    throw new Error(apiErrorMessage(err, "Login failed"));
+  }
 }
 
 export async function fetchMe(): Promise<UserResponse> {
@@ -204,13 +219,26 @@ export async function postCitizenReport(
     await delay();
     return createMockCitizenReport(payload);
   }
+  // Backend Zod rejects null photo_url — omit the field instead.
+  const body: Record<string, unknown> = {
+    device_id: payload.device_id,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    description: payload.description,
+  };
+  if (payload.photo_url) body.photo_url = payload.photo_url;
+
   const { data } = await api.post<ApiSuccess<CitizenReportRow>>(
     "/citizen-reports",
-    payload,
+    body,
   );
   return unwrap(data);
 }
 
 export function isMockMode() {
   return USE_MOCKS;
+}
+
+export function getApiBaseUrl() {
+  return baseURL;
 }

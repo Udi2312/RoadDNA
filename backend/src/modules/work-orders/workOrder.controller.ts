@@ -34,13 +34,13 @@ export async function getWorkOrders(req: Request, res: Response): Promise<void> 
 }
 
 export async function getWorkOrderById(req: Request, res: Response): Promise<void> {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const result = await service.getWorkOrderById(id);
   sendSuccess(res, result, 200);
 }
 
 export async function updateWorkOrder(req: Request, res: Response): Promise<void> {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const result = await service.updateWorkOrder(id, req.body as UpdateWorkOrderInput);
   sendSuccess(res, result, 200);
 }

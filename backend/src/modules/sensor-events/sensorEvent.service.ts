@@ -1,26 +1,24 @@
 // ─── Business logic for sensor event ingestion ───
-// Orchestrates device registration + event insertion.
-// Later: this is where we'll trigger the AI classification job.
+// Orchestrates device registration + event insertion + AI classification.
 
 import { SensorEventInput, IngestResult } from "./sensorEvent.types";
 import * as repo from "./sensorEvent.repository";
 import { PaginationParams } from "../../shared/utils/pagination";
 import { logger } from "../../config/logger";
+import { classifyEvents } from "../../services/aiClient";
 
 /**
  * Ingest a batch of sensor events from the mobile app.
  * 1. Auto-register (or touch) all unique devices
  * 2. Insert every event into sensor_events
- * 3. (TODO) Queue events for AI classification
+ * 3. Call AI /classify and persist into classified_events (best-effort)
  */
 export async function ingestEvents(
   events: SensorEventInput[]
 ): Promise<IngestResult> {
-  // 1. Deduplicate device IDs and upsert them
   const uniqueDevices = [...new Set(events.map((e) => e.device_id))];
   await Promise.all(uniqueDevices.map((id) => repo.ensureDevice(id)));
 
-  // 2. Insert all sensor events
   const eventIds = await Promise.all(
     events.map((event) => repo.insertSensorEvent(event))
   );
@@ -30,8 +28,16 @@ export async function ingestEvents(
     "Ingested sensor events"
   );
 
-  // TODO: Step 1.7 from the plan — push eventIds to BullMQ
-  //       so the classification job sends them to the AI service
+  const withIds = events.map((event, i) => ({
+    ...event,
+    event_id: eventIds[i],
+  }));
+
+  const results = await classifyEvents(withIds);
+  if (results.length > 0) {
+    const saved = await repo.upsertClassifications(results);
+    logger.info({ saved }, "Persisted AI classifications");
+  }
 
   return { ingested: eventIds.length, event_ids: eventIds };
 }

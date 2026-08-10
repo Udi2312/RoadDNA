@@ -9,6 +9,7 @@ class OfflineQueue {
   static final OfflineQueue instance = OfflineQueue._();
 
   static const _key = 'sensor_event_queue';
+  static const _batchSize = 50;
   final List<SensorEventPayload> _queue = [];
   final List<String> history = [];
 
@@ -48,19 +49,33 @@ class OfflineQueue {
 
     var sent = 0;
     final remaining = <SensorEventPayload>[];
-    for (final event in List<SensorEventPayload>.from(_queue)) {
+    final snapshot = List<SensorEventPayload>.from(_queue);
+
+    for (var i = 0; i < snapshot.length; i += _batchSize) {
+      final batch = snapshot.sublist(
+        i,
+        min(i + _batchSize, snapshot.length),
+      );
       try {
-        await ApiClient.instance.postSensorEvent(event);
-        sent += 1;
-        history.insert(
-          0,
-          '${event.timestamp} · spike sent (${event.latitude.toStringAsFixed(4)}, ${event.longitude.toStringAsFixed(4)})',
-        );
-        if (history.length > 50) history.removeLast();
+        await ApiClient.instance.postSensorEvents(batch);
+        sent += batch.length;
+        for (final event in batch) {
+          history.insert(
+            0,
+            '${event.timestamp} · spike sent (${event.latitude.toStringAsFixed(4)}, ${event.longitude.toStringAsFixed(4)})',
+          );
+          if (history.length > 50) history.removeLast();
+        }
       } catch (_) {
-        remaining.add(event);
+        remaining.addAll(batch);
+        // Keep remaining later items too
+        if (i + _batchSize < snapshot.length) {
+          remaining.addAll(snapshot.sublist(i + _batchSize));
+        }
+        break;
       }
     }
+
     _queue
       ..clear()
       ..addAll(remaining);
@@ -68,3 +83,5 @@ class OfflineQueue {
     return sent;
   }
 }
+
+int min(int a, int b) => a < b ? a : b;

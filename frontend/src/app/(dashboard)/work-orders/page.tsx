@@ -72,6 +72,7 @@ export default function WorkOrdersPage() {
       assigned: [],
       in_progress: [],
       completed: [],
+      cancelled: [],
     };
     for (const wo of query.data?.data ?? []) {
       if (map[wo.status]) map[wo.status].push(wo);

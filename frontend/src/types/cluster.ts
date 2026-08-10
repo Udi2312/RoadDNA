@@ -2,8 +2,9 @@ export type ClusterStatus =
   | "unconfirmed"
   | "confirmed"
   | "queued"
+  | "in_progress"
   | "fixed"
-  | "candidate";
+  | "rejected";
 
 export interface ClusterRow {
   cluster_id: string;

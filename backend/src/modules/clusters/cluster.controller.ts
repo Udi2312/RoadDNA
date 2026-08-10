@@ -26,13 +26,13 @@ export async function getClusters(req: Request, res: Response): Promise<void> {
 }
 
 export async function getClusterById(req: Request, res: Response): Promise<void> {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const clusterDetail = await service.getClusterById(id);
   sendSuccess(res, clusterDetail, 200);
 }
 
 export async function updateClusterStatus(req: Request, res: Response): Promise<void> {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status } = req.body as UpdateClusterStatusInput;
   const updatedCluster = await service.updateClusterStatus(id, status);
   sendSuccess(res, updatedCluster, 200);
