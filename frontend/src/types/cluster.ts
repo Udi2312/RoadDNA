@@ -35,14 +35,15 @@ export interface ClusterDetailData {
 
 /** Severity is 0–100 from Phase 1/2 backend. */
 export function severityLevel(
-  score: number,
+  score: number | string,
 ): "low" | "moderate" | "severe" {
-  if (score < 40) return "low";
-  if (score < 70) return "moderate";
+  const n = typeof score === "number" ? score : Number(score);
+  if (!Number.isFinite(n) || n < 40) return "low";
+  if (n < 70) return "moderate";
   return "severe";
 }
 
-export function severityColor(score: number): string {
+export function severityColor(score: number | string): string {
   const level = severityLevel(score);
   if (level === "low") return "#22c55e";
   if (level === "moderate") return "#eab308";
@@ -50,7 +51,7 @@ export function severityColor(score: number): string {
 }
 
 export function severityTone(
-  score: number,
+  score: number | string,
 ): "green" | "yellow" | "red" {
   const level = severityLevel(score);
   if (level === "low") return "green";

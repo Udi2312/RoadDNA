@@ -27,8 +27,7 @@ export default function MapPage() {
             GIS heatmap
           </h1>
           <p className="mt-1 text-sm text-[var(--rd-muted)]">
-            Clusters from GET /clusters?bbox=min_lng,min_lat,max_lng,max_lat as
-            the map viewport moves.
+            Interactive GIS heatmap of clusters for the selected municipality.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">

@@ -88,6 +88,52 @@ function unwrap<T>(payload: ApiSuccess<T> | T): T {
   return payload as T;
 }
 
+/** pg NUMERIC / DECIMAL often arrive as strings — coerce for UI math. */
+function num(value: unknown, fallback = 0): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeCluster(raw: ClusterRow): ClusterRow {
+  return {
+    ...raw,
+    latitude: num(raw.latitude),
+    longitude: num(raw.longitude),
+    report_count: num(raw.report_count),
+    distinct_devices: num(raw.distinct_devices),
+    severity_score: num(raw.severity_score),
+  };
+}
+
+function normalizeClusterDetail(raw: ClusterDetailData): ClusterDetailData {
+  return {
+    cluster: normalizeCluster(raw.cluster),
+    events: (raw.events ?? []).map((e) => ({
+      ...e,
+      accel_magnitude: num(e.accel_magnitude),
+      confidence: num(e.confidence),
+    })),
+  };
+}
+
+function normalizeWorkOrder(raw: WorkOrderRow): WorkOrderRow {
+  return {
+    ...raw,
+    priority_rank: num(raw.priority_rank),
+    cluster_severity: num(raw.cluster_severity),
+    cluster_latitude: num(raw.cluster_latitude),
+    cluster_longitude: num(raw.cluster_longitude),
+  };
+}
+
+function normalizeCitizenReport(raw: CitizenReportRow): CitizenReportRow {
+  return {
+    ...raw,
+    latitude: num(raw.latitude),
+    longitude: num(raw.longitude),
+  };
+}
+
 export async function login(email: string, password: string) {
   if (USE_MOCKS) {
     await delay();
@@ -131,7 +177,10 @@ export async function fetchClusters(params?: {
   const { data } = await api.get<PaginatedResponse<ClusterRow>>("/clusters", {
     params,
   });
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeCluster),
+  };
 }
 
 export async function fetchCluster(id: string): Promise<ClusterDetailData> {
@@ -144,7 +193,7 @@ export async function fetchCluster(id: string): Promise<ClusterDetailData> {
   const { data } = await api.get<ApiSuccess<ClusterDetailData>>(
     `/clusters/${id}`,
   );
-  return unwrap(data);
+  return normalizeClusterDetail(unwrap(data));
 }
 
 export async function fetchWorkOrders(params?: {
@@ -165,7 +214,10 @@ export async function fetchWorkOrders(params?: {
     "/work-orders",
     { params },
   );
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeWorkOrder),
+  };
 }
 
 export async function createWorkOrder(
@@ -179,7 +231,7 @@ export async function createWorkOrder(
     "/work-orders",
     payload,
   );
-  return unwrap(data);
+  return normalizeWorkOrder(unwrap(data));
 }
 
 export async function updateWorkOrder(
@@ -194,7 +246,7 @@ export async function updateWorkOrder(
     `/work-orders/${id}`,
     patch,
   );
-  return unwrap(data);
+  return normalizeWorkOrder(unwrap(data));
 }
 
 export async function fetchCitizenReports(params?: {
@@ -209,7 +261,10 @@ export async function fetchCitizenReports(params?: {
     "/citizen-reports",
     { params },
   );
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeCitizenReport),
+  };
 }
 
 export async function postCitizenReport(
@@ -232,7 +287,7 @@ export async function postCitizenReport(
     "/citizen-reports",
     body,
   );
-  return unwrap(data);
+  return normalizeCitizenReport(unwrap(data));
 }
 
 export function isMockMode() {

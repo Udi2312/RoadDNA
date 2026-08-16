@@ -76,18 +76,15 @@ export default function ClustersPage() {
                       </td>
                     </tr>
                   ))
-                : rows.map((c) => (
+                : rows.map((c, idx) => (
                     <tr
                       key={c.cluster_id}
                       className="border-b border-[var(--rd-border)] last:border-0"
                     >
                       <td className="px-4 py-3">
-                        <Link
-                          href={`/clusters/${c.cluster_id}`}
-                          className="font-medium text-[var(--rd-accent)] hover:underline"
-                        >
-                          {c.cluster_id}
-                        </Link>
+                        <div className="font-medium text-[var(--rd-accent)]">
+                          {`Cluster ${idx + 1} · ${c.cluster_id.slice(0, 8)}`}
+                        </div>
                         <p className="text-xs text-[var(--rd-muted)]">
                           {c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}
                         </p>

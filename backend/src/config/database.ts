@@ -6,8 +6,9 @@ import { logger } from "./logger";
 export const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 10,
-  idleTimeoutMillis: 10000, // Close idle clients after 10s to prevent Neon serverless timeout issues
-  connectionTimeoutMillis: 10000,
+  // Use slightly larger timeouts to accommodate occasional DNS/network slowness
+  idleTimeoutMillis: 30000, // Close idle clients after 30s to prevent Neon serverless timeout issues
+  connectionTimeoutMillis: 20000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 });
@@ -37,9 +38,12 @@ export async function queryWithRetry<T = any>(
       const isConnectionError =
         err.message?.includes("Connection terminated unexpectedly") ||
         err.message?.includes("closed the connection unexpectedly") ||
+        err.message?.includes("getaddrinfo") ||
         err.code === "57P01" || // admin_shutdown
         err.code === "57P02" || // crash_shutdown
         err.code === "57P03" || // cannot_connect_now
+        err.code === "EAI_AGAIN" || // DNS lookup timed out / temporary failure
+        err.code === "ENOTFOUND" ||
         err.code === "ECONNRESET";
 
       if (isConnectionError && attempt <= retries) {
