@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+// Link to cluster detail removed from UI
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createWorkOrder,
@@ -72,6 +72,7 @@ export default function WorkOrdersPage() {
       assigned: [],
       in_progress: [],
       completed: [],
+      cancelled: [],
     };
     for (const wo of query.data?.data ?? []) {
       if (map[wo.status]) map[wo.status].push(wo);
@@ -119,12 +120,9 @@ export default function WorkOrdersPage() {
                         className="rounded-xl border border-[var(--rd-border)] bg-[var(--rd-bg)] p-3"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <Link
-                            href={`/clusters/${wo.cluster_id}`}
-                            className="text-sm font-medium text-[var(--rd-accent)] hover:underline"
-                          >
-                            {wo.cluster_id.slice(0, 13)}…
-                          </Link>
+                          <div className="text-sm font-medium text-[var(--rd-accent)]">
+                            {`Cluster · ${wo.cluster_id.slice(0, 13)}…`}
+                          </div>
                           <Badge tone={severityTone(wo.cluster_severity)}>
                             {wo.cluster_severity.toFixed(0)}
                           </Badge>
@@ -172,7 +170,7 @@ export default function WorkOrdersPage() {
               Create work order
             </h2>
             <p className="mt-1 text-sm text-[var(--rd-muted)]">
-              POST /work-orders — cluster moves to queued.
+              {/* POST route reference removed from UI */}
             </p>
             <label className="mt-4 block text-sm">
               <span className="mb-1 block text-[var(--rd-muted)]">Cluster</span>
@@ -182,9 +180,9 @@ export default function WorkOrdersPage() {
                 className="h-10 w-full rounded-lg border border-[var(--rd-border)] bg-[var(--rd-bg)] px-3"
               >
                 <option value="">Select cluster…</option>
-                {(clusters.data?.data ?? []).map((c) => (
+                {(clusters.data?.data ?? []).map((c, idx) => (
                   <option key={c.cluster_id} value={c.cluster_id}>
-                    {c.cluster_id} (sev {c.severity_score.toFixed(0)})
+                    {`Cluster ${idx + 1} · ${c.cluster_id.slice(0, 8)} (sev ${c.severity_score.toFixed(0)})`}
                   </option>
                 ))}
               </select>

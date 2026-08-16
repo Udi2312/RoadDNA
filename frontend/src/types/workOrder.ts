@@ -2,7 +2,8 @@ export type WorkOrderStatus =
   | "open"
   | "assigned"
   | "in_progress"
-  | "completed";
+  | "completed"
+  | "cancelled";
 
 export interface WorkOrderRow {
   work_order_id: string;

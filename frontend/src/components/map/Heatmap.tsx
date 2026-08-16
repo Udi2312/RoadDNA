@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CircleMarker,
@@ -11,7 +11,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchClusters } from "@/lib/api";
 import { CAMPUS_CENTER } from "@/mocks/data";
 import { severityColor, severityLevel, severityTone } from "@/types/cluster";
@@ -25,19 +25,49 @@ function BoundsReporter({
 }) {
   const map = useMapEvents({
     moveend: () => {
-      const b = map.getBounds();
-      // Spec: bbox=min_lng,min_lat,max_lng,max_lat
-      onBbox(
-        `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
-      );
+      try {
+        const b = map.getBounds();
+        onBbox(
+          `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+        );
+      } catch {
+        // Map may be mid-teardown (React Strict Mode / route change)
+      }
     },
   });
 
   useEffect(() => {
-    const b = map.getBounds();
-    onBbox(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+    try {
+      const b = map.getBounds();
+      onBbox(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+    } catch {
+      // ignore first paint races
+    }
   }, [map, onBbox]);
 
+  return null;
+}
+
+function MapReady({ onReady }: { onReady: () => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try {
+        map.invalidateSize();
+        onReady();
+      } catch {
+        // ignore
+      }
+    }, 50);
+    return () => {
+      window.clearTimeout(id);
+      try {
+        map.stop();
+      } catch {
+        // ignore
+      }
+    };
+  }, [map, onReady]);
   return null;
 }
 
@@ -50,9 +80,30 @@ function FlyToSelected({
 }) {
   const map = useMap();
   useEffect(() => {
-    if (lat != null && lng != null) {
-      map.flyTo([lat, lng], 16, { duration: 0.6 });
-    }
+    if (lat == null || lng == null) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      if (cancelled) return;
+      try {
+        // Pane must exist; otherwise Leaflet throws _leaflet_pos
+        if (!map.getPane("mapPane")) return;
+        map.flyTo([lat, lng], 16, { duration: 0.45 });
+      } catch {
+        // ignore teardown races
+      }
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+      try {
+        map.stop();
+      } catch {
+        // ignore
+      }
+    };
   }, [lat, lng, map]);
   return null;
 }
@@ -68,20 +119,26 @@ export function Heatmap({
   status?: string;
   severityMin?: number;
 }) {
-  const [bbox, setBbox] = useState<string | undefined>();
+  // Do not drive cluster queries by map viewport bbox
+  // (avoid GET /clusters?bbox=... as the map moves)
   const [search, setSearch] = useState("");
+  const [mapReady, setMapReady] = useState(false);
   const selectedClusterId = useUiStore((s) => s.selectedClusterId);
   const setSelectedClusterId = useUiStore((s) => s.setSelectedClusterId);
 
+  const onMapReady = useCallback(() => setMapReady(true), []);
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["clusters", bbox, status, severityMin],
+    queryKey: ["clusters", status, severityMin],
     queryFn: () =>
       fetchClusters({
-        bbox,
+        // intentionally do not send bbox from the map viewport
         status,
         severity_min: severityMin,
         limit: 100,
       }),
+    // Keep previous clusters while bbox/filter refetch runs — avoids remounting MapContainer
+    placeholderData: keepPreviousData,
   });
 
   const clusters = useMemo(() => {
@@ -97,10 +154,15 @@ export function Heatmap({
           c.status.toLowerCase().includes(q),
       );
     }
-    return list;
+    return list.filter(
+      (c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude),
+    );
   }, [data, filterSeverity, search]);
 
   const selected = clusters.find((c) => c.cluster_id === selectedClusterId);
+
+  // Only skeleton on the very first load (no data yet). Never unmount the map on refetch.
+  const showInitialSkeleton = isLoading && !data;
 
   return (
     <Card className="overflow-hidden">
@@ -119,10 +181,10 @@ export function Heatmap({
         </p>
       </div>
 
-      <div className={heightClass}>
-        {isLoading ? (
+      <div className={`relative ${heightClass}`}>
+        {showInitialSkeleton ? (
           <Skeleton className="h-full w-full rounded-none" />
-        ) : isError ? (
+        ) : isError && !data ? (
           <div className="flex h-full items-center justify-center text-sm text-red-600">
             Failed to load clusters.
           </div>
@@ -132,18 +194,23 @@ export function Heatmap({
             zoom={13}
             className="h-full w-full"
             scrollWheelZoom
+            // Prevent React from recreating the map instance unnecessarily
+            preferCanvas
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <BoundsReporter onBbox={setBbox} />
-            <FlyToSelected
-              lat={selected?.latitude ?? null}
-              lng={selected?.longitude ?? null}
-            />
-            {clusters.map((c) => {
-              const intensity = Math.min(1, c.severity_score / 100);
+            <MapReady onReady={onMapReady} />
+            {/* viewport bbox reporter removed to avoid frequent bbox queries */}
+            {mapReady ? (
+              <FlyToSelected
+                lat={selected?.latitude ?? null}
+                lng={selected?.longitude ?? null}
+              />
+            ) : null}
+            {clusters.map((c, idx) => {
+              const intensity = Math.min(1, Number(c.severity_score) / 100);
               return (
                 <CircleMarker
                   key={c.cluster_id}
@@ -159,10 +226,10 @@ export function Heatmap({
                     click: () => setSelectedClusterId(c.cluster_id),
                   }}
                 >
-                  <Popup>
+                    <Popup>
                     <div className="min-w-[180px] space-y-1 text-sm">
-                      <p className="font-semibold">{c.cluster_id.slice(0, 8)}…</p>
-                      <p>Severity: {c.severity_score.toFixed(1)}</p>
+                      <p className="font-semibold">{`Cluster ${idx + 1} · ${c.cluster_id.slice(0, 8)}`}</p>
+                      <p>Severity: {Number(c.severity_score).toFixed(1)}</p>
                       <p>
                         Reports: {c.report_count} · Devices:{" "}
                         {c.distinct_devices}
@@ -170,14 +237,7 @@ export function Heatmap({
                       <Badge tone={severityTone(c.severity_score)}>
                         {severityLevel(c.severity_score)}
                       </Badge>
-                      <div className="pt-2">
-                        <Link
-                          href={`/clusters/${c.cluster_id}`}
-                          className="text-[var(--rd-accent)] underline"
-                        >
-                          Open detail
-                        </Link>
-                      </div>
+                      {/* Details page removed from map popup */}
                     </div>
                   </Popup>
                 </CircleMarker>

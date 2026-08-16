@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import {
   createMockCitizenReport,
   createMockWorkOrder,
@@ -45,6 +45,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+function apiErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as
+      | { message?: string; error?: string }
+      | undefined;
+    return data?.message || data?.error || err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 function delay(ms = 280) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -77,16 +88,66 @@ function unwrap<T>(payload: ApiSuccess<T> | T): T {
   return payload as T;
 }
 
+/** pg NUMERIC / DECIMAL often arrive as strings — coerce for UI math. */
+function num(value: unknown, fallback = 0): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeCluster(raw: ClusterRow): ClusterRow {
+  return {
+    ...raw,
+    latitude: num(raw.latitude),
+    longitude: num(raw.longitude),
+    report_count: num(raw.report_count),
+    distinct_devices: num(raw.distinct_devices),
+    severity_score: num(raw.severity_score),
+  };
+}
+
+function normalizeClusterDetail(raw: ClusterDetailData): ClusterDetailData {
+  return {
+    cluster: normalizeCluster(raw.cluster),
+    events: (raw.events ?? []).map((e) => ({
+      ...e,
+      accel_magnitude: num(e.accel_magnitude),
+      confidence: num(e.confidence),
+    })),
+  };
+}
+
+function normalizeWorkOrder(raw: WorkOrderRow): WorkOrderRow {
+  return {
+    ...raw,
+    priority_rank: num(raw.priority_rank),
+    cluster_severity: num(raw.cluster_severity),
+    cluster_latitude: num(raw.cluster_latitude),
+    cluster_longitude: num(raw.cluster_longitude),
+  };
+}
+
+function normalizeCitizenReport(raw: CitizenReportRow): CitizenReportRow {
+  return {
+    ...raw,
+    latitude: num(raw.latitude),
+    longitude: num(raw.longitude),
+  };
+}
+
 export async function login(email: string, password: string) {
   if (USE_MOCKS) {
     await delay();
     return mockLogin(email, password);
   }
-  const { data } = await api.post<ApiSuccess<ReturnType<typeof mockLogin>>>(
-    "/auth/login",
-    { email, password },
-  );
-  return unwrap(data);
+  try {
+    const { data } = await api.post<ApiSuccess<ReturnType<typeof mockLogin>>>(
+      "/auth/login",
+      { email, password },
+    );
+    return unwrap(data);
+  } catch (err) {
+    throw new Error(apiErrorMessage(err, "Login failed"));
+  }
 }
 
 export async function fetchMe(): Promise<UserResponse> {
@@ -116,7 +177,10 @@ export async function fetchClusters(params?: {
   const { data } = await api.get<PaginatedResponse<ClusterRow>>("/clusters", {
     params,
   });
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeCluster),
+  };
 }
 
 export async function fetchCluster(id: string): Promise<ClusterDetailData> {
@@ -129,7 +193,7 @@ export async function fetchCluster(id: string): Promise<ClusterDetailData> {
   const { data } = await api.get<ApiSuccess<ClusterDetailData>>(
     `/clusters/${id}`,
   );
-  return unwrap(data);
+  return normalizeClusterDetail(unwrap(data));
 }
 
 export async function fetchWorkOrders(params?: {
@@ -150,7 +214,10 @@ export async function fetchWorkOrders(params?: {
     "/work-orders",
     { params },
   );
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeWorkOrder),
+  };
 }
 
 export async function createWorkOrder(
@@ -164,7 +231,7 @@ export async function createWorkOrder(
     "/work-orders",
     payload,
   );
-  return unwrap(data);
+  return normalizeWorkOrder(unwrap(data));
 }
 
 export async function updateWorkOrder(
@@ -179,7 +246,7 @@ export async function updateWorkOrder(
     `/work-orders/${id}`,
     patch,
   );
-  return unwrap(data);
+  return normalizeWorkOrder(unwrap(data));
 }
 
 export async function fetchCitizenReports(params?: {
@@ -194,7 +261,10 @@ export async function fetchCitizenReports(params?: {
     "/citizen-reports",
     { params },
   );
-  return data;
+  return {
+    ...data,
+    data: (data.data ?? []).map(normalizeCitizenReport),
+  };
 }
 
 export async function postCitizenReport(
@@ -204,13 +274,26 @@ export async function postCitizenReport(
     await delay();
     return createMockCitizenReport(payload);
   }
+  // Backend Zod rejects null photo_url — omit the field instead.
+  const body: Record<string, unknown> = {
+    device_id: payload.device_id,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    description: payload.description,
+  };
+  if (payload.photo_url) body.photo_url = payload.photo_url;
+
   const { data } = await api.post<ApiSuccess<CitizenReportRow>>(
     "/citizen-reports",
-    payload,
+    body,
   );
-  return unwrap(data);
+  return normalizeCitizenReport(unwrap(data));
 }
 
 export function isMockMode() {
   return USE_MOCKS;
+}
+
+export function getApiBaseUrl() {
+  return baseURL;
 }

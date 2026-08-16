@@ -26,7 +26,7 @@ export async function insertSensorEvent(
     event.accel_x,
     event.accel_y,
     event.accel_z,
-    event.accel_magnitude,
+    event.accel_magnitude ?? 0,
     event.gyro_x,
     event.gyro_y,
     event.gyro_z,
@@ -92,4 +92,31 @@ export async function findSensorEvents(
   const dataResult = await queryWithRetry<SensorEventRow>(dataQuery, dataValues);
 
   return { rows: dataResult.rows, total };
+}
+
+export async function upsertClassifications(
+  results: Array<{
+    event_id: string;
+    predicted_label: string;
+    confidence: number;
+    model_version: string;
+  }>
+): Promise<number> {
+  if (results.length === 0) return 0;
+
+  let saved = 0;
+  for (const r of results) {
+    await queryWithRetry(
+      `INSERT INTO classified_events
+         (event_id, predicted_label, confidence, model_version)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (event_id) DO UPDATE
+       SET predicted_label = EXCLUDED.predicted_label,
+           confidence = EXCLUDED.confidence,
+           model_version = EXCLUDED.model_version`,
+      [r.event_id, r.predicted_label, r.confidence, r.model_version]
+    );
+    saved += 1;
+  }
+  return saved;
 }

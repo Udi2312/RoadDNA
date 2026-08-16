@@ -17,7 +17,13 @@ export async function ingestEvents(
   res: Response
 ): Promise<void> {
   const { events } = req.body as IngestEventsBody;
-  const result = await service.ingestEvents(events);
+  const normalized = events.map((e) => {
+    const mag =
+      e.accel_magnitude ??
+      Math.sqrt(e.accel_x ** 2 + e.accel_y ** 2 + e.accel_z ** 2);
+    return { ...e, accel_magnitude: mag };
+  });
+  const result = await service.ingestEvents(normalized);
   sendSuccess(res, result, 201);
 }
 

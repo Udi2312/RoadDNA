@@ -20,4 +20,6 @@ export const config = {
   adminEmail: process.env.ADMIN_EMAIL || "admin@roaddna.gov",
   adminPassword: process.env.ADMIN_PASSWORD || "AdminPassword123!",
   adminFullName: process.env.ADMIN_FULL_NAME || "Lead City Engineer",
+  /** FastAPI AI microservice base URL (no trailing slash). Empty disables classify calls. */
+  aiServiceUrl: process.env.AI_SERVICE_URL || "http://localhost:8000",
 };
