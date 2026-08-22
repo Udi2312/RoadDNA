@@ -1,0 +1,9 @@
+{
+  "name": "roaddna",
+  "private": true,
+  "scripts": {
+    "mock-api": "node scripts/mock-api/server.mjs",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build"
+  }
+}
